@@ -90,6 +90,19 @@ def tg_get_updates(offset: int | None) -> list[dict[str, Any]]:
     return data["result"]
 
 
+def tg_delete_webhook() -> None:
+    resp = tg.post(
+        f"{TG_API}/deleteWebhook",
+        params={"drop_pending_updates": "false"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    if not data.get("ok"):
+        raise RuntimeError(f"Telegram deleteWebhook failed: {data}")
+
+
 def tg_get_file_info(file_id: str) -> dict[str, Any]:
     resp = tg.get(
         f"{TG_API}/getFile",
@@ -443,6 +456,7 @@ def handle_channel_post(post: dict[str, Any]) -> None:
 # =========================
 def main() -> None:
     state = load_state()
+    tg_delete_webhook()
     log.info("Мост Telegram -> MAX запущен")
 
     while True:
