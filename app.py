@@ -80,13 +80,33 @@ def tg_get_updates(offset: int | None) -> list[dict[str, Any]]:
         params=params,
         timeout=POLL_TIMEOUT + 10,
     )
-    resp.raise_for_status()
+
+    if not resp.ok:
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = {"raw": resp.text}
+        raise RuntimeError(
+            f"Telegram getUpdates failed: status={resp.status_code}, body={payload}"
+        )
+
     data = resp.json()
 
     if not data.get("ok"):
         raise RuntimeError(f"Telegram getUpdates failed: {data}")
 
     return data["result"]
+
+
+def tg_print_webhook_info() -> None:
+    resp = tg.get(f"{TG_API}/getWebhookInfo", timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if not data.get("ok"):
+        raise RuntimeError(f"Telegram getWebhookInfo failed: {data}")
+
+    log.info("Telegram webhook info: %s", data["result"])
 
 
 def tg_delete_webhook() -> None:
@@ -521,7 +541,9 @@ def flush_ready_media_groups(
 def main() -> None:
     state = load_state()
     pending_media_groups: dict[str, dict[str, Any]] = {}
+    tg_print_webhook_info()
     tg_delete_webhook()
+    tg_print_webhook_info()
     log.info("Telegram -> MAX bridge started")
 
     while True:
