@@ -18,7 +18,7 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 MAX_BOT_TOKEN = os.environ["MAX_BOT_TOKEN"]
 
-SOURCE_TG_CHAT_ID = int(os.environ["SOURCE_TG_CHAT_ID"])
+SOURCE_TG_CHAT = os.environ.get("SOURCE_TG_CHAT") or os.environ["SOURCE_TG_CHAT_ID"]
 TARGET_MAX_CHAT = os.environ.get("TARGET_MAX_CHAT") or os.environ["TARGET_MAX_CHAT_ID"]
 
 POLL_TIMEOUT = int(os.getenv("POLL_TIMEOUT", "30"))
@@ -127,6 +127,38 @@ def tg_download_file(file_id: str) -> tuple[bytes, str, str | None]:
     resp.raise_for_status()
 
     return resp.content, filename, mime_type
+
+
+def normalize_tg_chat_target(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        raise RuntimeError("SOURCE_TG_CHAT is empty")
+
+    if raw.lstrip("-").isdigit():
+        return raw
+
+    if raw.startswith("@"):
+        return raw[1:].lower()
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        parsed = urlparse(raw)
+        path = parsed.path.strip("/")
+        if not path:
+            raise RuntimeError(f"Invalid Telegram link: {raw}")
+        return path.lower()
+
+    return raw.strip("/").lower()
+
+
+def tg_post_matches_source(post: dict[str, Any]) -> bool:
+    chat = post["chat"]
+    source_target = normalize_tg_chat_target(SOURCE_TG_CHAT)
+
+    if source_target.lstrip("-").isdigit():
+        return int(chat["id"]) == int(source_target)
+
+    username = (chat.get("username") or "").strip().lower()
+    return username == source_target
 
 
 # =========================
@@ -427,7 +459,7 @@ def handle_channel_posts(posts: list[dict[str, Any]]) -> None:
     first_post = posts[0]
     chat_id = int(first_post["chat"]["id"])
 
-    if chat_id != SOURCE_TG_CHAT_ID:
+    if not tg_post_matches_source(first_post):
         return
 
     text = get_posts_text(posts)
