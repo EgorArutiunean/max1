@@ -214,7 +214,9 @@ def max_resolve_recipient(target: str) -> dict[str, int]:
     if normalized_target.lstrip("-").isdigit():
         return {"chat_id": int(normalized_target)}
 
-    for chat in max_iter_chats():
+    chats = max_iter_chats()
+
+    for chat in chats:
         link = (chat.get("link") or "").strip()
         title = (chat.get("title") or "").strip().lower()
         dialog_user = chat.get("dialog_with_user") or {}
@@ -228,6 +230,20 @@ def max_resolve_recipient(target: str) -> dict[str, int]:
 
         if normalized_target in candidates:
             return {"chat_id": int(chat["chat_id"])}
+
+    log.warning(
+        "MAX target was not resolved. target=%s available_chats=%s",
+        normalized_target,
+        [
+            {
+                "chat_id": chat.get("chat_id"),
+                "title": chat.get("title"),
+                "link": chat.get("link"),
+                "username": (chat.get("dialog_with_user") or {}).get("username"),
+            }
+            for chat in chats[:20]
+        ],
+    )
 
     raise RuntimeError(
         "Could not resolve TARGET_MAX_CHAT into chat_id. "
