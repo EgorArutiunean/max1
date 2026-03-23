@@ -256,12 +256,21 @@ def max_upload_file(
         )
 
     resp.raise_for_status()
-    upload_result = resp.json()
+
+    try:
+        upload_result = resp.json()
+    except ValueError:
+        upload_result = {}
 
     if "token" in upload_result:
         payload = upload_result
     elif "token" in slot:
         payload = {"token": slot["token"]}
+    elif not upload_result:
+        raise RuntimeError(
+            f"MAX upload succeeded with empty response but no token was provided: "
+            f"type={kind}, status={resp.status_code}"
+        )
     else:
         payload = upload_result
 
