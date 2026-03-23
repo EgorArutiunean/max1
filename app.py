@@ -2,6 +2,7 @@ import json
 import logging
 import mimetypes
 import os
+import socket
 import time
 from pathlib import Path
 from typing import Any
@@ -544,6 +545,11 @@ def main() -> None:
     tg_print_webhook_info()
     tg_delete_webhook()
     tg_print_webhook_info()
+    log.info(
+        "Bridge instance started | hostname=%s | pid=%s",
+        socket.gethostname(),
+        os.getpid(),
+    )
     log.info("Telegram -> MAX bridge started")
 
     while True:
