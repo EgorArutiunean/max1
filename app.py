@@ -45,6 +45,10 @@ mx.headers.update({"Authorization": MAX_BOT_TOKEN})
 _target_max_recipient: dict[str, int] | None = None
 
 
+class TelegramPollingConflict(RuntimeError):
+    pass
+
+
 # =========================
 # STATE
 # =========================
@@ -87,6 +91,10 @@ def tg_get_updates(offset: int | None) -> list[dict[str, Any]]:
             payload = resp.json()
         except Exception:
             payload = {"raw": resp.text}
+        if resp.status_code == 409:
+            raise TelegramPollingConflict(
+                f"Telegram getUpdates conflict: {payload.get('description', payload)}"
+            )
         raise RuntimeError(
             f"Telegram getUpdates failed: status={resp.status_code}, body={payload}"
         )
@@ -531,9 +539,10 @@ def flush_ready_media_groups(
             ready_group_ids.append(media_group_id)
 
     for media_group_id in ready_group_ids:
-        group = pending_media_groups.pop(media_group_id)
+        group = pending_media_groups[media_group_id]
         posts = sorted(group["posts"], key=lambda item: item.get("message_id", 0))
         handle_channel_posts(posts)
+        pending_media_groups.pop(media_group_id, None)
 
 
 # =========================
@@ -582,6 +591,9 @@ def main() -> None:
 
         except requests.RequestException as exc:
             log.exception("Network error: %s", exc)
+            time.sleep(5)
+        except TelegramPollingConflict as exc:
+            log.warning("%s", exc)
             time.sleep(5)
         except KeyboardInterrupt:
             log.info("Stopped by Ctrl+C")
